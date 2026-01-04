@@ -1,0 +1,731 @@
+import React, { useState } from 'react';
+import { BookOpen, Send, FileText, CheckCircle, XCircle, RotateCcw, Image, X, Star, Sparkles, Trophy, Target, Zap } from 'lucide-react';
+
+export default function RevisionApp() {
+  const [step, setStep] = useState('input');
+  const [lesson, setLesson] = useState('');
+  const [images, setImages] = useState([]);
+  const [revisionSheet, setRevisionSheet] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [answers, setAnswers] = useState({});
+  const [showResults, setShowResults] = useState(false);
+
+  const handleImageUpload = (e) => {
+    const files = Array.from(e.target.files);
+    
+    files.forEach(file => {
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          setImages(prev => [...prev, {
+            data: event.target.result,
+            name: file.name
+          }]);
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  };
+
+  const removeImage = (index) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const generateRevisionSheet = async () => {
+    if (!lesson.trim() && images.length === 0) return;
+    
+    setLoading(true);
+    
+    try {
+      const messageContent = [];
+      
+      images.forEach(img => {
+        messageContent.push({
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: "image/jpeg",
+            data: img.data.split(',')[1]
+          }
+        });
+      });
+      
+      const promptText = images.length > 0 
+        ? `Tu es un assistant pédagogique expert. Analyse ${images.length > 1 ? 'ces images' : 'cette image'} et le texte suivant pour créer une fiche de révision TRÈS DÉTAILLÉE et COMPLÈTE.
+
+${lesson ? `Texte de la leçon:\n${lesson}` : 'Crée une fiche de révision basée sur le contenu des images.'}
+
+IMPORTANT : Cette fiche doit être EXHAUSTIVE pour que l'étudiant n'oublie AUCUN détail important.
+
+Crée une fiche de révision au format JSON avec cette structure exacte:
+{
+  "titre": "Titre précis de la leçon",
+  "resume": "Résumé détaillé en 4-6 phrases couvrant tous les aspects principaux de la leçon",
+  "contexte": "Contexte historique, scientifique ou théorique (2-3 phrases expliquant pourquoi c'est important)",
+  "points_cles": [
+    "Point clé 1 avec explication détaillée et exemples concrets",
+    "Point clé 2 avec tous les détails importants à retenir",
+    "Point clé 3 avec formules, dates, noms ou chiffres précis",
+    "Point clé 4 avec liens entre les concepts",
+    "Point clé 5 avec applications pratiques",
+    "Au moins 6-8 points détaillés"
+  ],
+  "definitions": [
+    {
+      "terme": "Terme technique 1",
+      "definition": "Définition claire et précise avec exemple"
+    },
+    {
+      "terme": "Terme technique 2",
+      "definition": "Définition complète"
+    }
+  ],
+  "formules_dates": [
+    "Formule mathématique ou date importante 1 avec explication",
+    "Formule ou date 2 avec contexte d'utilisation",
+    "Toutes les formules, dates, chiffres clés mentionnés"
+  ],
+  "pieges_erreurs": [
+    "Erreur courante 1 à éviter absolument",
+    "Piège classique 2 et comment l'éviter",
+    "Confusion fréquente 3 avec clarification"
+  ],
+  "astuces_memorisation": [
+    "Astuce mnémotechnique 1 pour retenir facilement",
+    "Moyen mnémotechnique 2 (phrase, acronyme, image mentale)",
+    "Technique de mémorisation 3"
+  ],
+  "exemples_concrets": [
+    "Exemple pratique 1 illustrant le concept",
+    "Cas d'application 2 avec détails",
+    "Situation réelle 3 démontrant l'utilisation"
+  ],
+  "questions": [
+    {
+      "question": "Question QCM 1 testant la compréhension globale",
+      "options": ["Réponse A détaillée", "Réponse B détaillée", "Réponse C détaillée", "Réponse D détaillée"],
+      "reponse": "Réponse correcte exacte",
+      "explication": "Pourquoi cette réponse est correcte et pourquoi les autres sont fausses",
+      "type": "qcm"
+    },
+    {
+      "question": "Question QCM 2 sur un détail précis",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "reponse": "Bonne réponse",
+      "explication": "Explication détaillée",
+      "type": "qcm"
+    },
+    {
+      "question": "Question ouverte 1 demandant d'expliquer un concept majeur",
+      "reponse": "Réponse détaillée attendue avec tous les éléments clés",
+      "points_importants": ["Élément 1 à mentionner", "Élément 2 à mentionner", "Élément 3 à mentionner"],
+      "type": "ouverte"
+    },
+    {
+      "question": "Question ouverte 2 sur l'application pratique",
+      "reponse": "Réponse complète avec exemple",
+      "points_importants": ["Point 1", "Point 2", "Point 3"],
+      "type": "ouverte"
+    },
+    "Crée au moins 8-12 questions variées (50% QCM, 50% ouvertes)"
+  ],
+  "pour_aller_plus_loin": [
+    "Notion connexe 1 à explorer",
+    "Lien avec autre sujet 2",
+    "Approfondissement possible 3"
+  ]
+}
+
+Réponds UNIQUEMENT avec le JSON, sans texte avant ou après, sans backticks.`
+        : `Tu es un assistant pédagogique expert. À partir de la leçon suivante, crée une fiche de révision TRÈS DÉTAILLÉE et COMPLÈTE.
+
+Leçon:
+${lesson}
+
+IMPORTANT : Cette fiche doit être EXHAUSTIVE pour que l'étudiant n'oublie AUCUN détail important. Extrais TOUS les points importants, définitions, formules, dates, noms, chiffres, exemples mentionnés dans la leçon.
+
+Crée une fiche de révision au format JSON avec cette structure exacte:
+{
+  "titre": "Titre précis de la leçon",
+  "resume": "Résumé détaillé en 4-6 phrases couvrant tous les aspects principaux de la leçon",
+  "contexte": "Contexte historique, scientifique ou théorique (2-3 phrases expliquant pourquoi c'est important)",
+  "points_cles": [
+    "Point clé 1 avec explication détaillée et exemples concrets",
+    "Point clé 2 avec tous les détails importants à retenir",
+    "Point clé 3 avec formules, dates, noms ou chiffres précis",
+    "Point clé 4 avec liens entre les concepts",
+    "Point clé 5 avec applications pratiques",
+    "Au moins 6-8 points détaillés"
+  ],
+  "definitions": [
+    {
+      "terme": "Terme technique 1",
+      "definition": "Définition claire et précise avec exemple"
+    },
+    {
+      "terme": "Terme technique 2",
+      "definition": "Définition complète"
+    }
+  ],
+  "formules_dates": [
+    "Formule mathématique ou date importante 1 avec explication",
+    "Formule ou date 2 avec contexte d'utilisation",
+    "Toutes les formules, dates, chiffres clés mentionnés"
+  ],
+  "pieges_erreurs": [
+    "Erreur courante 1 à éviter absolument",
+    "Piège classique 2 et comment l'éviter",
+    "Confusion fréquente 3 avec clarification"
+  ],
+  "astuces_memorisation": [
+    "Astuce mnémotechnique 1 pour retenir facilement",
+    "Moyen mnémotechnique 2 (phrase, acronyme, image mentale)",
+    "Technique de mémorisation 3"
+  ],
+  "exemples_concrets": [
+    "Exemple pratique 1 illustrant le concept",
+    "Cas d'application 2 avec détails",
+    "Situation réelle 3 démontrant l'utilisation"
+  ],
+  "questions": [
+    {
+      "question": "Question QCM 1 testant la compréhension globale",
+      "options": ["Réponse A détaillée", "Réponse B détaillée", "Réponse C détaillée", "Réponse D détaillée"],
+      "reponse": "Réponse correcte exacte",
+      "explication": "Pourquoi cette réponse est correcte et pourquoi les autres sont fausses",
+      "type": "qcm"
+    },
+    {
+      "question": "Question QCM 2 sur un détail précis",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "reponse": "Bonne réponse",
+      "explication": "Explication détaillée",
+      "type": "qcm"
+    },
+    {
+      "question": "Question ouverte 1 demandant d'expliquer un concept majeur",
+      "reponse": "Réponse détaillée attendue avec tous les éléments clés",
+      "points_importants": ["Élément 1 à mentionner", "Élément 2 à mentionner", "Élément 3 à mentionner"],
+      "type": "ouverte"
+    },
+    {
+      "question": "Question ouverte 2 sur l'application pratique",
+      "reponse": "Réponse complète avec exemple",
+      "points_importants": ["Point 1", "Point 2", "Point 3"],
+      "type": "ouverte"
+    },
+    "Crée au moins 8-12 questions variées (50% QCM, 50% ouvertes)"
+  ],
+  "pour_aller_plus_loin": [
+    "Notion connexe 1 à explorer",
+    "Lien avec autre sujet 2",
+    "Approfondissement possible 3"
+  ]
+}
+
+Réponds UNIQUEMENT avec le JSON, sans texte avant ou après, sans backticks.`;
+      
+      messageContent.push({
+        type: "text",
+        text: promptText
+      });
+      
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 4000,
+          messages: [
+            {
+              role: "user",
+              content: messageContent
+            }
+          ],
+        })
+      });
+
+      const data = await response.json();
+      const content = data.content[0].text.trim();
+      
+      const cleanJson = content.replace(/```json|```/g, '').trim();
+      const sheet = JSON.parse(cleanJson);
+      
+      setRevisionSheet(sheet);
+      setStep('review');
+    } catch (error) {
+      console.error('Erreur:', error);
+      alert('Erreur lors de la génération de la fiche. Veuillez réessayer.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAnswerChange = (index, value) => {
+    setAnswers({ ...answers, [index]: value });
+  };
+
+  const checkAnswers = () => {
+    setShowResults(true);
+  };
+
+  const resetApp = () => {
+    setStep('input');
+    setLesson('');
+    setImages([]);
+    setRevisionSheet(null);
+    setAnswers({});
+    setShowResults(false);
+  };
+
+  const getScore = () => {
+    if (!revisionSheet) return 0;
+    let correct = 0;
+    revisionSheet.questions.forEach((q, i) => {
+      if (q.type === 'qcm' && answers[i] === q.reponse) {
+        correct++;
+      }
+    });
+    return correct;
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-100 via-pink-50 to-yellow-100 p-4 pb-20 relative overflow-hidden">
+      {/* Stickers décoratifs flottants */}
+      <div className="absolute top-10 left-10 text-6xl animate-bounce" style={{animationDuration: '3s'}}>
+        ✏️
+      </div>
+      <div className="absolute top-32 right-20 text-5xl animate-bounce" style={{animationDuration: '4s', animationDelay: '0.5s'}}>
+        📚
+      </div>
+      <div className="absolute bottom-40 left-20 text-6xl animate-bounce" style={{animationDuration: '3.5s', animationDelay: '1s'}}>
+        🎓
+      </div>
+      <div className="absolute top-60 right-10 text-5xl rotate-12">
+        ⭐
+      </div>
+      <div className="absolute bottom-60 right-40 text-4xl -rotate-12">
+        💡
+      </div>
+      <div className="absolute top-40 left-1/3 text-5xl animate-pulse">
+        🌟
+      </div>
+      <div className="absolute bottom-80 left-1/4 text-4xl">
+        📝
+      </div>
+      <div className="absolute top-96 right-1/4 text-5xl animate-pulse" style={{animationDuration: '2s'}}>
+        🚀
+      </div>
+      
+      <div className="max-w-4xl mx-auto relative z-10">
+        <header className="text-center mb-10 pt-8">
+          <div className="inline-block relative">
+            <div className="absolute -top-8 -right-8 text-4xl animate-spin" style={{animationDuration: '20s'}}>
+              ✨
+            </div>
+            <div className="absolute -top-6 -left-6 text-3xl animate-pulse">
+              🎯
+            </div>
+            <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl p-8 border-4 border-purple-300">
+              <div className="flex items-center justify-center gap-4 mb-3">
+                <span className="text-5xl">📖</span>
+                <h1 className="text-5xl font-black bg-gradient-to-r from-purple-600 via-pink-600 to-yellow-600 bg-clip-text text-transparent">
+                  Fiches Magiques
+                </h1>
+                <span className="text-5xl">✨</span>
+              </div>
+              <p className="text-xl text-purple-700 font-semibold">Transforme tes cours en révisions fun ! 🎉</p>
+            </div>
+          </div>
+        </header>
+
+        {step === 'input' && (
+          <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 border-4 border-pink-300 relative">
+            <div className="absolute -top-5 -right-5 bg-yellow-400 rounded-full p-3 shadow-lg border-4 border-white rotate-12">
+              <Sparkles className="w-8 h-8 text-yellow-800" />
+            </div>
+            
+            <h2 className="text-3xl font-black text-gray-800 mb-6 flex items-center gap-3">
+              <span className="text-4xl">📄</span>
+              Entre ta leçon ici !
+            </h2>
+            
+            <textarea
+              value={lesson}
+              onChange={(e) => setLesson(e.target.value)}
+              placeholder="Colle ton cours, tes notes, tes formules... tout ce que tu veux réviser ! 📝"
+              className="w-full h-72 p-6 border-4 border-purple-200 rounded-2xl focus:border-pink-400 focus:outline-none resize-none text-gray-800 text-lg bg-gradient-to-br from-purple-50 to-pink-50 font-medium shadow-inner"
+            />
+            
+            <div className="mt-8">
+              <label className="flex items-center justify-center gap-3 w-full p-6 border-4 border-dashed border-yellow-300 rounded-2xl cursor-pointer hover:border-pink-400 hover:bg-gradient-to-r hover:from-yellow-50 hover:to-pink-50 transition-all bg-white shadow-lg group">
+                <span className="text-5xl group-hover:scale-110 transition-transform">📸</span>
+                <span className="text-gray-700 font-bold text-lg">Ajoute des photos de ton cours !</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            {images.length > 0 && (
+              <div className="mt-6 grid grid-cols-2 gap-4">
+                {images.map((img, i) => (
+                  <div key={i} className="relative group">
+                    <div className="absolute -top-3 -right-3 bg-pink-400 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold shadow-lg border-2 border-white z-10">
+                      {i + 1}
+                    </div>
+                    <img 
+                      src={img.data} 
+                      alt={img.name}
+                      className="w-full h-40 object-cover rounded-2xl border-4 border-purple-200 shadow-lg"
+                    />
+                    <button
+                      onClick={() => removeImage(i)}
+                      className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 shadow-lg border-2 border-white"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                    <p className="text-sm text-purple-700 mt-2 truncate font-semibold">{img.name}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            <button
+              onClick={generateRevisionSheet}
+              disabled={(!lesson.trim() && images.length === 0) || loading}
+              className="w-full mt-8 bg-gradient-to-r from-purple-500 via-pink-500 to-yellow-500 text-white py-6 rounded-2xl font-black text-xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3 border-4 border-white shadow-xl hover:scale-105 transform"
+            >
+              {loading ? (
+                <>
+                  <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Magie en cours... ✨</span>
+                </>
+              ) : (
+                <>
+                  <Zap className="w-6 h-6" />
+                  <span>Créer ma fiche magique ! 🚀</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
+        {step === 'review' && revisionSheet && (
+          <div className="space-y-8">
+            <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 border-4 border-yellow-300 relative">
+              <div className="absolute -top-5 -right-5 bg-pink-400 rounded-full p-3 shadow-lg border-4 border-white">
+                <Star className="w-8 h-8 text-white" />
+              </div>
+              
+              <h2 className="text-4xl font-black bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-6 flex items-center gap-3">
+                <span className="text-5xl">🎯</span>
+                {revisionSheet.titre}
+              </h2>
+              
+              {/* Contexte */}
+              {revisionSheet.contexte && (
+                <div className="mb-6 bg-gradient-to-r from-blue-50 to-cyan-50 p-6 rounded-2xl border-3 border-blue-200">
+                  <h3 className="text-2xl font-black text-blue-700 mb-3 flex items-center gap-2">
+                    <span className="text-3xl">🌍</span>
+                    Contexte
+                  </h3>
+                  <p className="text-gray-800 text-lg leading-relaxed font-medium">{revisionSheet.contexte}</p>
+                </div>
+              )}
+              
+              {/* Résumé */}
+              <div className="mb-6 bg-gradient-to-r from-purple-50 to-pink-50 p-6 rounded-2xl border-3 border-purple-200">
+                <h3 className="text-2xl font-black text-purple-700 mb-3 flex items-center gap-2">
+                  <span className="text-3xl">💡</span>
+                  Résumé détaillé
+                </h3>
+                <p className="text-gray-800 text-lg leading-relaxed font-medium">{revisionSheet.resume}</p>
+              </div>
+
+              {/* Points clés */}
+              <div className="mb-6 bg-gradient-to-r from-yellow-50 to-pink-50 p-6 rounded-2xl border-3 border-yellow-200">
+                <h3 className="text-2xl font-black text-yellow-700 mb-4 flex items-center gap-2">
+                  <span className="text-3xl">⭐</span>
+                  Points super importants !
+                </h3>
+                <ul className="space-y-3">
+                  {revisionSheet.points_cles.map((point, i) => (
+                    <li key={i} className="flex items-start gap-3 bg-white p-4 rounded-xl shadow-md border-2 border-yellow-200">
+                      <span className="text-2xl flex-shrink-0">✨</span>
+                      <span className="text-gray-800 font-semibold text-lg">{point}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Définitions */}
+              {revisionSheet.definitions && revisionSheet.definitions.length > 0 && (
+                <div className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-2xl border-3 border-green-200">
+                  <h3 className="text-2xl font-black text-green-700 mb-4 flex items-center gap-2">
+                    <span className="text-3xl">📖</span>
+                    Définitions à connaître
+                  </h3>
+                  <div className="space-y-4">
+                    {revisionSheet.definitions.map((def, i) => (
+                      <div key={i} className="bg-white p-4 rounded-xl shadow-md border-2 border-green-200">
+                        <p className="font-black text-green-700 text-lg mb-2">{def.terme}</p>
+                        <p className="text-gray-800 font-medium">{def.definition}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Formules et dates */}
+              {revisionSheet.formules_dates && revisionSheet.formules_dates.length > 0 && (
+                <div className="mb-6 bg-gradient-to-r from-orange-50 to-red-50 p-6 rounded-2xl border-3 border-orange-200">
+                  <h3 className="text-2xl font-black text-orange-700 mb-4 flex items-center gap-2">
+                    <span className="text-3xl">🔢</span>
+                    Formules, dates & chiffres clés
+                  </h3>
+                  <ul className="space-y-3">
+                    {revisionSheet.formules_dates.map((item, i) => (
+                      <li key={i} className="flex items-start gap-3 bg-white p-4 rounded-xl shadow-md border-2 border-orange-200">
+                        <span className="text-2xl flex-shrink-0">📌</span>
+                        <span className="text-gray-800 font-semibold text-lg">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Pièges et erreurs */}
+              {revisionSheet.pieges_erreurs && revisionSheet.pieges_erreurs.length > 0 && (
+                <div className="mb-6 bg-gradient-to-r from-red-50 to-pink-50 p-6 rounded-2xl border-3 border-red-200">
+                  <h3 className="text-2xl font-black text-red-700 mb-4 flex items-center gap-2">
+                    <span className="text-3xl">⚠️</span>
+                    Attention aux pièges !
+                  </h3>
+                  <ul className="space-y-3">
+                    {revisionSheet.pieges_erreurs.map((piege, i) => (
+                      <li key={i} className="flex items-start gap-3 bg-white p-4 rounded-xl shadow-md border-2 border-red-200">
+                        <span className="text-2xl flex-shrink-0">❌</span>
+                        <span className="text-gray-800 font-semibold text-lg">{piege}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Astuces de mémorisation */}
+              {revisionSheet.astuces_memorisation && revisionSheet.astuces_memorisation.length > 0 && (
+                <div className="mb-6 bg-gradient-to-r from-indigo-50 to-purple-50 p-6 rounded-2xl border-3 border-indigo-200">
+                  <h3 className="text-2xl font-black text-indigo-700 mb-4 flex items-center gap-2">
+                    <span className="text-3xl">🧠</span>
+                    Astuces pour retenir facilement
+                  </h3>
+                  <ul className="space-y-3">
+                    {revisionSheet.astuces_memorisation.map((astuce, i) => (
+                      <li key={i} className="flex items-start gap-3 bg-white p-4 rounded-xl shadow-md border-2 border-indigo-200">
+                        <span className="text-2xl flex-shrink-0">💭</span>
+                        <span className="text-gray-800 font-semibold text-lg">{astuce}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Exemples concrets */}
+              {revisionSheet.exemples_concrets && revisionSheet.exemples_concrets.length > 0 && (
+                <div className="mb-6 bg-gradient-to-r from-teal-50 to-cyan-50 p-6 rounded-2xl border-3 border-teal-200">
+                  <h3 className="text-2xl font-black text-teal-700 mb-4 flex items-center gap-2">
+                    <span className="text-3xl">🔍</span>
+                    Exemples concrets
+                  </h3>
+                  <ul className="space-y-3">
+                    {revisionSheet.exemples_concrets.map((exemple, i) => (
+                      <li key={i} className="flex items-start gap-3 bg-white p-4 rounded-xl shadow-md border-2 border-teal-200">
+                        <span className="text-2xl flex-shrink-0">💼</span>
+                        <span className="text-gray-800 font-semibold text-lg">{exemple}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Pour aller plus loin */}
+              {revisionSheet.pour_aller_plus_loin && revisionSheet.pour_aller_plus_loin.length > 0 && (
+                <div className="bg-gradient-to-r from-violet-50 to-fuchsia-50 p-6 rounded-2xl border-3 border-violet-200">
+                  <h3 className="text-2xl font-black text-violet-700 mb-4 flex items-center gap-2">
+                    <span className="text-3xl">🚀</span>
+                    Pour aller plus loin
+                  </h3>
+                  <ul className="space-y-3">
+                    {revisionSheet.pour_aller_plus_loin.map((item, i) => (
+                      <li key={i} className="flex items-start gap-3 bg-white p-4 rounded-xl shadow-md border-2 border-violet-200">
+                        <span className="text-2xl flex-shrink-0">🌟</span>
+                        <span className="text-gray-800 font-semibold text-lg">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 border-4 border-pink-300 relative">
+              <div className="absolute -top-5 -left-5 bg-yellow-400 rounded-full p-3 shadow-lg border-4 border-white">
+                <Target className="w-8 h-8 text-yellow-800" />
+              </div>
+              
+              <h3 className="text-3xl font-black text-gray-800 mb-8 flex items-center gap-3">
+                <span className="text-4xl">🎓</span>
+                Quiz time ! Montre ce que tu sais !
+              </h3>
+              
+              {revisionSheet.questions.map((q, i) => (
+                <div key={i} className="mb-8 pb-8 border-b-4 border-purple-200 last:border-0">
+                  <p className="text-xl font-bold text-gray-800 mb-4 flex items-start gap-3 bg-gradient-to-r from-purple-100 to-pink-100 p-4 rounded-xl border-2 border-purple-300">
+                    <span className="text-2xl flex-shrink-0">❓</span>
+                    <span>{i + 1}. {q.question}</span>
+                  </p>
+                  
+                  {q.type === 'qcm' ? (
+                    <div className="space-y-3">
+                      {q.options.map((opt, j) => (
+                        <label
+                          key={j}
+                          className={`flex items-center gap-4 p-5 rounded-xl border-3 cursor-pointer transition-all shadow-md font-semibold text-lg ${
+                            answers[i] === opt
+                              ? 'border-purple-500 bg-gradient-to-r from-purple-100 to-pink-100 shadow-lg scale-105'
+                              : 'border-gray-300 bg-white hover:border-pink-400 hover:shadow-lg'
+                          } ${
+                            showResults && opt === q.reponse
+                              ? 'bg-gradient-to-r from-green-100 to-green-200 border-green-500'
+                              : ''
+                          } ${
+                            showResults && answers[i] === opt && opt !== q.reponse
+                              ? 'bg-gradient-to-r from-red-100 to-red-200 border-red-500'
+                              : ''
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name={`q${i}`}
+                            value={opt}
+                            checked={answers[i] === opt}
+                            onChange={(e) => handleAnswerChange(i, e.target.value)}
+                            disabled={showResults}
+                            className="w-5 h-5 text-purple-600"
+                          />
+                          <span className="text-gray-800">{opt}</span>
+                          {showResults && opt === q.reponse && (
+                            <CheckCircle className="w-6 h-6 text-green-600 ml-auto" />
+                          )}
+                          {showResults && answers[i] === opt && opt !== q.reponse && (
+                            <XCircle className="w-6 h-6 text-red-600 ml-auto" />
+                          )}
+                        </label>
+                      ))}
+                      {showResults && q.explication && (
+                        <div className="mt-4 p-5 bg-gradient-to-r from-blue-100 to-cyan-100 border-3 border-blue-400 rounded-xl shadow-lg">
+                          <p className="text-sm font-black text-blue-800 mb-2 flex items-center gap-2">
+                            <span className="text-xl">💡</span>
+                            Explication :
+                          </p>
+                          <p className="text-blue-700 font-semibold text-lg">{q.explication}</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      <textarea
+                        value={answers[i] || ''}
+                        onChange={(e) => handleAnswerChange(i, e.target.value)}
+                        placeholder="Écris ta réponse ici... 📝"
+                        disabled={showResults}
+                        className="w-full p-5 border-3 border-purple-200 rounded-xl focus:border-pink-400 focus:outline-none resize-none bg-gradient-to-br from-purple-50 to-pink-50 font-medium text-lg shadow-inner"
+                        rows="4"
+                      />
+                      {showResults && (
+                        <div className="mt-4 space-y-4">
+                          <div className="p-5 bg-gradient-to-r from-blue-100 to-cyan-100 border-3 border-blue-400 rounded-xl shadow-lg">
+                            <p className="text-sm font-black text-blue-800 mb-2 flex items-center gap-2">
+                              <span className="text-xl">💡</span>
+                              Réponse attendue :
+                            </p>
+                            <p className="text-blue-700 font-semibold text-lg">{q.reponse}</p>
+                          </div>
+                          {q.points_importants && q.points_importants.length > 0 && (
+                            <div className="p-5 bg-gradient-to-r from-green-100 to-emerald-100 border-3 border-green-400 rounded-xl shadow-lg">
+                              <p className="text-sm font-black text-green-800 mb-3 flex items-center gap-2">
+                                <span className="text-xl">✅</span>
+                                Points importants à mentionner :
+                              </p>
+                              <ul className="space-y-2">
+                                {q.points_importants.map((point, idx) => (
+                                  <li key={idx} className="flex items-start gap-2 text-green-700 font-semibold">
+                                    <span className="text-lg">•</span>
+                                    <span>{point}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {!showResults ? (
+                <button
+                  onClick={checkAnswers}
+                  className="w-full bg-gradient-to-r from-green-400 to-emerald-500 text-white py-6 rounded-2xl font-black text-xl hover:shadow-2xl transition-all flex items-center justify-center gap-3 border-4 border-white shadow-xl hover:scale-105 transform"
+                >
+                  <CheckCircle className="w-6 h-6" />
+                  Vérifier mes réponses ! 🎯
+                </button>
+              ) : (
+                <div className="space-y-6">
+                  <div className="bg-gradient-to-r from-yellow-200 via-pink-200 to-purple-200 border-4 border-yellow-400 rounded-2xl p-8 text-center shadow-2xl relative">
+                    <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
+                      <Trophy className="w-12 h-12 text-yellow-600" />
+                    </div>
+                    <p className="text-4xl font-black text-purple-800 mt-4 mb-2">
+                      Score: {getScore()} / {revisionSheet.questions.filter(q => q.type === 'qcm').length}
+                    </p>
+                    <p className="text-2xl font-bold text-pink-700">
+                      {getScore() === revisionSheet.questions.filter(q => q.type === 'qcm').length ? 
+                        "Parfait ! Tu es un(e) champion(ne) ! 🏆" : 
+                        getScore() > revisionSheet.questions.filter(q => q.type === 'qcm').length / 2 ?
+                        "Bien joué ! Continue comme ça ! 🌟" :
+                        "Courage ! Relis ta leçon ! 💪"
+                      }
+                    </p>
+                  </div>
+                  <button
+                    onClick={resetApp}
+                    className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-6 rounded-2xl font-black text-xl hover:shadow-2xl transition-all flex items-center justify-center gap-3 border-4 border-white shadow-xl hover:scale-105 transform"
+                  >
+                    <RotateCcw className="w-6 h-6" />
+                    Nouvelle leçon ! 🚀
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <footer className="fixed bottom-0 left-0 right-0 bg-gradient-to-r from-purple-600 via-pink-600 to-yellow-600 py-4 text-center z-20 border-t-4 border-white shadow-2xl">
+        <p className="text-white font-black text-lg tracking-wide">
+          ✨ Créé par <span className="text-yellow-200">Avy Mrejen</span> ✨
+        </p>
+      </footer>
+    </div>
+  );
+}
